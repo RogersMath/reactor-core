@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { Zap, RotateCcw, Atom, Play, RefreshCcw, ScrollText, Calculator } from 'lucide-react';
+import { Zap, RotateCcw, Atom, Play, RefreshCcw, ScrollText, Calculator, X } from 'lucide-react';
 
 /* -------------------------------------------------------------------------- */
 /*                                AUDIO ENGINE                                */
@@ -51,9 +51,30 @@ const SoundEngine = {
 /* -------------------------------------------------------------------------- */
 
 const UnitGrid = ({ value }) => {
-  if (value === 0) return null;
   const absValue = Math.abs(value);
   const isPositive = value > 0;
+  const isZero = value === 0;
+  
+  // Special case for zero - show blue square with 0
+  if (isZero) {
+    return (
+      <div className="flex gap-2 flex-wrap items-center justify-center">
+        <div 
+          className="relative border-2 rounded-lg p-2 flex flex-col items-center justify-center backdrop-blur-sm shadow-lg bg-blue-500/10 border-blue-400/40 shadow-blue-400/20"
+          style={{ minWidth: '60px', minHeight: '60px' }}
+          aria-label="0 units"
+        >
+          <div className="absolute top-0 right-0 bg-white/90 text-blue-600 font-bold text-xs rounded-bl px-1.5 py-0.5">
+            0
+          </div>
+          <div className="text-blue-300 text-3xl font-bold leading-none" aria-hidden="true">
+            0
+          </div>
+        </div>
+      </div>
+    );
+  }
+  
   const color = isPositive ? 'green' : 'red';
   
   // Create squares of max 25
@@ -94,6 +115,67 @@ const UnitGrid = ({ value }) => {
 };
 
 /* -------------------------------------------------------------------------- */
+/*                           TUTORIAL COMPONENT                               */
+/* -------------------------------------------------------------------------- */
+
+const Tutorial = ({ onClose }) => {
+  return (
+    <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+      <div className="bg-slate-900 border-2 border-cyan-400/40 rounded-3xl p-8 max-w-2xl shadow-[0_0_50px_rgba(8,145,178,0.3)]">
+        <div className="flex justify-between items-start mb-6">
+          <h2 className="text-3xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-blue-500">
+            Reactor Core Tutorial
+          </h2>
+          <button 
+            onClick={onClose}
+            className="text-cyan-400 hover:text-cyan-300 transition-colors"
+            aria-label="Close tutorial"
+          >
+            <X size={32} />
+          </button>
+        </div>
+
+        <div className="space-y-6 text-cyan-100">
+          <div className="bg-slate-800/50 rounded-xl p-6 border border-cyan-500/20">
+            <h3 className="text-xl font-bold text-yellow-400 mb-3">🎯 Your Mission</h3>
+            <p className="text-lg leading-relaxed">
+              <strong>Get the value next to E to equal 0.</strong> When you do, the reactor stabilizes and you win!
+            </p>
+          </div>
+
+          <div className="bg-slate-800/50 rounded-xl p-6 border border-cyan-500/20">
+            <h3 className="text-xl font-bold text-cyan-400 mb-3">⚛️ How It Works</h3>
+            <div className="space-y-3">
+              <p>• <span className="text-yellow-400 font-bold">E</span> represents an unknown energy level</p>
+              <p>• The equation shows: <span className="font-mono text-cyan-300">E + (number) = result</span></p>
+              <p>• Tap any energy card to inject it into BOTH sides of the equation</p>
+              <p>• <span className="text-green-400">Matter ⚛ (+)</span> adds positive energy</p>
+              <p>• <span className="text-red-400">Antimatter ⚛ (−)</span> adds negative energy</p>
+            </div>
+          </div>
+
+          <div className="bg-slate-800/50 rounded-xl p-6 border border-cyan-500/20">
+            <h3 className="text-xl font-bold text-purple-400 mb-3">💡 Example</h3>
+            <div className="space-y-2 font-mono text-sm">
+              <p>If you see: <span className="text-cyan-300">E + (2) = 7</span></p>
+              <p>You need: <span className="text-red-400">2 Antimatter</span> to get to <span className="text-yellow-400">E + (0) = 5</span></p>
+              <p className="text-green-400 mt-2">✓ Reactor Stabilized!</p>
+            </div>
+          </div>
+
+          <button
+            onClick={onClose}
+            className="w-full bg-cyan-600 hover:bg-cyan-500 text-white px-8 py-4 rounded-xl text-xl font-bold shadow-lg transition-all hover:scale-105"
+          >
+            Start Mission
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+/* -------------------------------------------------------------------------- */
 /*                                MAIN COMPONENT                              */
 /* -------------------------------------------------------------------------- */
 
@@ -101,6 +183,7 @@ export default function App() {
   // State with localStorage persistence
   const [level, setLevel] = useState(() => parseInt(localStorage.getItem('rc_level') || '1'));
   const [puzzlesSolved, setPuzzlesSolved] = useState(() => parseInt(localStorage.getItem('rc_solved') || '0'));
+  const [showTutorial, setShowTutorial] = useState(() => !localStorage.getItem('rc_tutorial_seen'));
   const [gameState, setGameState] = useState('menu');
   const [deck, setDeck] = useState([]);
   const [leftConstant, setLeftConstant] = useState(0);
@@ -150,12 +233,37 @@ export default function App() {
       ariaLabel: val === 1 ? `1 unit of ${type}` : `${val} units of ${type}`
     });
     
-    // Ensure odd/even mix
-    const cards = [
-      create(Math.floor(Math.random() * maxVal) + 1, 'antimatter'),
-      create(Math.floor(Math.random() * maxVal) + 1, 'matter'),
-      create(Math.floor(Math.random() * maxVal) + 1, Math.random() > 0.5 ? 'matter' : 'antimatter')
-    ];
+    // FIX #4: Guarantee solvability with one odd and one even, one of each type
+    const cards = [];
+    
+    // First card: random value, random type
+    const val1 = Math.floor(Math.random() * maxVal) + 1;
+    const type1 = Math.random() > 0.5 ? 'matter' : 'antimatter';
+    cards.push(create(val1, type1));
+    
+    // Second card: opposite type, ensure we have one odd and one even
+    const type2 = type1 === 'matter' ? 'antimatter' : 'matter';
+    const isVal1Even = val1 % 2 === 0;
+    let val2;
+    if (isVal1Even) {
+      // Need an odd value
+      const oddVals = [];
+      for (let i = 1; i <= maxVal; i += 2) oddVals.push(i);
+      val2 = oddVals[Math.floor(Math.random() * oddVals.length)];
+    } else {
+      // Need an even value
+      const evenVals = [];
+      for (let i = 2; i <= maxVal; i += 2) evenVals.push(i);
+      if (evenVals.length === 0) evenVals.push(2); // Fallback
+      val2 = evenVals[Math.floor(Math.random() * evenVals.length)];
+    }
+    cards.push(create(val2, type2));
+    
+    // Third card: random value and type
+    const val3 = Math.floor(Math.random() * maxVal) + 1;
+    const type3 = Math.random() > 0.5 ? 'matter' : 'antimatter';
+    cards.push(create(val3, type3));
+    
     return cards.sort(() => Math.random() - 0.5);
   };
 
@@ -179,7 +287,13 @@ export default function App() {
 
   const initLevel = () => {
     const maxVal = Math.min(5, Math.floor(level / 2) + 3);
-    const b = Math.floor(Math.random() * (maxVal * 2)) - maxVal;
+    
+    // FIX #3: Prevent E = 0 starting state - ensure leftConstant (b) is never 0
+    let b;
+    do {
+      b = Math.floor(Math.random() * (maxVal * 2)) - maxVal;
+    } while (b === 0);
+    
     const solution = Math.floor(Math.random() * (maxVal * 2)) - maxVal;
     const c = solution + b;
 
@@ -288,21 +402,33 @@ export default function App() {
     setMoveHistory(prev => prev.slice(0, -1));
   };
 
+  // FIX #1: Always show E + (value) format, even for negative values
   const getSymbolicEquation = () => {
-    const left = leftConstant === 0 ? 'E' : leftConstant > 0 ? `E + ${leftConstant}` : `E − ${Math.abs(leftConstant)}`;
-    return `${left} = ${rightValue}`;
+    if (leftConstant === 0) return `E = ${rightValue}`;
+    const sign = leftConstant > 0 ? '+' : '';
+    return `E ${sign} (${leftConstant}) = ${rightValue}`;
   };
 
   const handleResetProgress = () => {
     if (window.confirm('Reset all progress? This cannot be undone.')) {
       localStorage.removeItem('rc_level');
       localStorage.removeItem('rc_solved');
-      setLevel(1);
-      setPuzzlesSolved(0);
+      localStorage.removeItem('rc_tutorial_seen');
+      // Reload the page to ensure clean state
+      window.location.reload();
     }
   };
 
+  const handleCloseTutorial = () => {
+    setShowTutorial(false);
+    localStorage.setItem('rc_tutorial_seen', 'true');
+  };
+
   // --- RENDER VIEWS ---
+
+  if (showTutorial) {
+    return <Tutorial onClose={handleCloseTutorial} />;
+  }
 
   if (gameState === 'menu') {
     return (
@@ -345,19 +471,28 @@ export default function App() {
               <p>• <span className="text-yellow-400">E</span> represents unknown energy level</p>
               <p>• Tap any card - streams to BOTH sides!</p>
               <p>• Watch the energy streams collide!</p>
-              <p>• Isolate E to balance the reactor</p>
+              <p>• <strong className="text-yellow-300">Get the value next to E to equal 0!</strong></p>
             </div>
           </div>
 
-          {(level > 1 || puzzlesSolved > 0) && (
+          <div className="flex gap-4 justify-center mt-4">
             <button
-              onClick={handleResetProgress}
-              className="mt-4 text-cyan-400/40 hover:text-cyan-400/60 text-xs underline transition-colors focus:outline-none focus:ring-2 focus:ring-cyan-400/50 rounded"
-              aria-label="Reset all progress"
+              onClick={() => setShowTutorial(true)}
+              className="text-cyan-400/60 hover:text-cyan-400 text-sm underline transition-colors focus:outline-none focus:ring-2 focus:ring-cyan-400/50 rounded px-2 py-1"
+              aria-label="Show tutorial"
             >
-              Reset Progress
+              Show Tutorial
             </button>
-          )}
+            {(level > 1 || puzzlesSolved > 0) && (
+              <button
+                onClick={handleResetProgress}
+                className="text-cyan-400/40 hover:text-cyan-400/60 text-xs underline transition-colors focus:outline-none focus:ring-2 focus:ring-cyan-400/50 rounded"
+                aria-label="Reset all progress"
+              >
+                Reset Progress
+              </button>
+            )}
+          </div>
         </div>
       </div>
     );
@@ -538,12 +673,12 @@ export default function App() {
             <div 
               className="flex-1 flex justify-end items-center gap-4 min-h-[100px]"
               role="region"
-              aria-label={`Left side: E ${leftConstant !== 0 ? (leftConstant > 0 ? `plus ${leftConstant}` : `minus ${Math.abs(leftConstant)}`) : ''}`}
+              aria-label={`Left side: E ${leftConstant !== 0 ? (leftConstant > 0 ? `plus ${leftConstant}` : `plus negative ${Math.abs(leftConstant)}`) : ''}`}
             >
               <span className="text-yellow-400 font-bold drop-shadow-[0_0_15px_rgba(250,204,21,0.6)] animate-pulse" aria-label="Unknown energy E">E</span>
               {leftConstant !== 0 && (
                 <>
-                  <span className="text-cyan-500 font-light" aria-hidden="true">{leftConstant > 0 ? '+' : '−'}</span>
+                  <span className="text-cyan-500 font-light" aria-hidden="true">+</span>
                   <div className="scale-75 md:scale-100 transition-all"><UnitGrid value={leftConstant} /></div>
                 </>
               )}

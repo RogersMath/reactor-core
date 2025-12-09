@@ -119,16 +119,72 @@ const UnitGrid = ({ value }) => {
 /* -------------------------------------------------------------------------- */
 
 const Tutorial = ({ onClose }) => {
+  const modalRef = useRef(null);
+  const closeButtonRef = useRef(null);
+  
+  // Focus trap: Keep focus within modal
+  useEffect(() => {
+    if (!modalRef.current) return;
+    
+    const focusableElements = modalRef.current.querySelectorAll(
+      'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
+    );
+    const firstElement = focusableElements[0];
+    const lastElement = focusableElements[focusableElements.length - 1];
+    
+    // Focus the close button when modal opens
+    closeButtonRef.current?.focus();
+    
+    const handleTabKey = (e) => {
+      if (e.key !== 'Tab') return;
+      
+      if (e.shiftKey) {
+        // Shift + Tab
+        if (document.activeElement === firstElement) {
+          lastElement.focus();
+          e.preventDefault();
+        }
+      } else {
+        // Tab
+        if (document.activeElement === lastElement) {
+          firstElement.focus();
+          e.preventDefault();
+        }
+      }
+    };
+    
+    const handleEscapeKey = (e) => {
+      if (e.key === 'Escape') {
+        onClose();
+      }
+    };
+    
+    document.addEventListener('keydown', handleTabKey);
+    document.addEventListener('keydown', handleEscapeKey);
+    
+    return () => {
+      document.removeEventListener('keydown', handleTabKey);
+      document.removeEventListener('keydown', handleEscapeKey);
+    };
+  }, [onClose]);
+  
   return (
     <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-      <div className="bg-slate-900 border-2 border-cyan-400/40 rounded-3xl p-8 max-w-2xl shadow-[0_0_50px_rgba(8,145,178,0.3)]">
+      <div 
+        ref={modalRef}
+        className="bg-slate-900 border-2 border-cyan-400/40 rounded-3xl p-8 max-w-2xl shadow-[0_0_50px_rgba(8,145,178,0.3)]"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="tutorial-title"
+      >
         <div className="flex justify-between items-start mb-6">
-          <h2 className="text-3xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-blue-500">
+          <h2 id="tutorial-title" className="text-3xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-blue-500">
             Reactor Core Tutorial
           </h2>
           <button 
+            ref={closeButtonRef}
             onClick={onClose}
-            className="text-cyan-400 hover:text-cyan-300 transition-colors"
+            className="text-cyan-400 hover:text-cyan-300 transition-colors focus:outline-none focus:ring-4 focus:ring-cyan-400 rounded"
             aria-label="Close tutorial"
           >
             <X size={32} />
@@ -165,7 +221,7 @@ const Tutorial = ({ onClose }) => {
 
           <button
             onClick={onClose}
-            className="w-full bg-cyan-600 hover:bg-cyan-500 text-white px-8 py-4 rounded-xl text-xl font-bold shadow-lg transition-all hover:scale-105"
+            className="w-full bg-cyan-600 hover:bg-cyan-500 text-white px-8 py-4 rounded-xl text-xl font-bold shadow-lg transition-all hover:scale-105 focus:outline-none focus:ring-4 focus:ring-cyan-400"
           >
             Start Mission
           </button>
@@ -323,6 +379,9 @@ export default function App() {
   const handleCardClick = async (card) => {
     if (isAnimating) return;
     
+    // Store the remaining cards for focus management
+    const remainingCards = deck.filter(c => c.id !== card.id);
+    
     // Clear any existing timeouts
     timeoutsRef.current.forEach(clearTimeout);
     timeoutsRef.current = [];
@@ -372,6 +431,15 @@ export default function App() {
           setSelectedCardId(null);
           setParticles([]);
           setIsAnimating(false);
+
+          // Focus management: Try to focus the first remaining card after animation
+          const focusTimeout = setTimeout(() => {
+            if (remainingCards.length > 0) {
+              const firstRemainingButton = document.querySelector(`button[data-card-id="${remainingCards[0].id}"]`);
+              firstRemainingButton?.focus();
+            }
+          }, 100);
+          timeoutsRef.current.push(focusTimeout);
 
           // Check if solved
           if (newLeft === 0) {
@@ -441,7 +509,7 @@ export default function App() {
           <h1 className="text-6xl md:text-7xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-blue-500 tracking-wider">
             REACTOR CORE
           </h1>
-          <p className="text-xl text-cyan-200/60 tracking-widest">ENERGY EQUATION SYSTEM</p>
+          <p className="text-xl text-cyan-200/80 tracking-widest">ENERGY EQUATION SYSTEM</p>
           
           <button 
             onClick={initLevel} 
@@ -734,6 +802,7 @@ export default function App() {
                   key={card.id}
                   onClick={() => handleCardClick(card)}
                   disabled={isAnimating}
+                  data-card-id={card.id}
                   style={{ animationDelay: `${delay}ms` }}
                   className={`
                     relative group transition-all duration-200 active:scale-95

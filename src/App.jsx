@@ -169,10 +169,10 @@ const Tutorial = ({ onClose }) => {
   }, [onClose]);
   
   return (
-    <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+    <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4 overflow-y-auto">
       <div 
         ref={modalRef}
-        className="bg-slate-900 border-2 border-cyan-400/40 rounded-3xl p-8 max-w-2xl shadow-[0_0_50px_rgba(8,145,178,0.3)]"
+        className="bg-slate-900 border-2 border-cyan-400/40 rounded-3xl p-8 max-w-2xl my-8 shadow-[0_0_50px_rgba(8,145,178,0.3)]"
         role="dialog"
         aria-modal="true"
         aria-labelledby="tutorial-title"
@@ -501,10 +501,10 @@ export default function App() {
   if (gameState === 'menu') {
     return (
       <div 
-        className="min-h-screen bg-gradient-to-br from-slate-950 via-blue-950 to-slate-950 flex flex-col items-center justify-center p-4 font-sans"
+        className="min-h-screen bg-gradient-to-br from-slate-950 via-blue-950 to-slate-950 flex flex-col items-center justify-start sm:justify-center p-4 py-8 font-sans overflow-y-auto"
         role="main"
       >
-        <div className="text-center mb-8 space-y-6">
+        <div className="text-center mb-8 space-y-6 w-full max-w-3xl">
           <div className="text-8xl animate-pulse" role="img" aria-label="Reactor Core">⚡</div>
           <h1 className="text-6xl md:text-7xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-blue-500 tracking-wider">
             REACTOR CORE
@@ -530,7 +530,7 @@ export default function App() {
           </div>
 
           {/* Instructions Panel */}
-          <div className="bg-slate-900/40 backdrop-blur-sm rounded-2xl p-6 max-w-lg border-2 border-cyan-400/20 mt-8">
+          <div className="bg-slate-900/40 backdrop-blur-sm rounded-2xl p-6 max-w-lg mx-auto border-2 border-cyan-400/20 mt-8">
             <div className="text-center mb-4 text-3xl" role="img" aria-label="Reactor">🔋</div>
             <h2 className="text-cyan-300 font-bold text-xl mb-3 text-center">Core Operations:</h2>
             <div className="text-cyan-100/80 space-y-2 text-base text-left">
